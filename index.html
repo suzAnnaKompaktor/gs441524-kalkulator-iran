@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="hu">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A rögzített protokolladatok matematikai átszámítását bemutató kalkulátor.">
+  <title>GS-441524 – dózis-összehasonlító kalkulátor</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    :root { --app-bg:#f5f7fa; --ink:#243247; --muted:#64748b; --line:#e2e8f0; }
+    body { background:var(--app-bg); color:var(--ink); }
+    .app-shell { max-width:1050px; }
+    .app-header { background:linear-gradient(135deg,#183b56,#286477); color:#fff; border-radius:1.1rem; }
+    .app-header p { color:rgba(255,255,255,.78); }
+    .card { border:1px solid var(--line); border-radius:1rem; box-shadow:0 4px 18px rgba(28,45,64,.045); }
+    .form-label { font-weight:600; }
+    .form-control,.form-select { min-height:46px; border-color:#cbd5e1; }
+    .form-control:focus,.form-select:focus { border-color:#4d91a2; box-shadow:0 0 0 .2rem rgba(77,145,162,.15); }
+    .result-panel { background:#f0f7f7; border:1px solid #c8e1e1; border-radius:.85rem; }
+    .result-number { font-variant-numeric:tabular-nums; font-size:clamp(1.25rem,3vw,1.8rem); font-weight:750; color:#155e63; }
+    .table>:not(caption)>*>* { padding:.8rem .75rem; vertical-align:middle; }
+    .table thead th { color:#526174; font-size:.82rem; font-weight:700; white-space:nowrap; }
+    .num { font-variant-numeric:tabular-nums; }
+    .notice { border-left:4px solid #d69e2e; background:#fff9e9; }
+    .muted-note { color:var(--muted); }
+    .section-kicker { color:#64748b; font-size:.76rem; letter-spacing:.08em; text-transform:uppercase; font-weight:700; }
+    footer { color:#64748b; }
+    @media (max-width:575.98px) {
+      .table>:not(caption)>*>* { padding:.65rem .45rem; font-size:.88rem; }
+      .table thead th { white-space:normal; }
+    }
+  </style>
+</head>
+<body>
+<main class="container app-shell py-4 py-lg-5">
+  <header class="app-header p-4 p-lg-5 mb-4">
+    <div class="section-kicker text-white-50 mb-2">Matematikai átszámító eszköz</div>
+    <h1 class="h2 fw-bold mb-2">GS-441524 – dózis-összehasonlító kalkulátor</h1>
+    <p class="mb-0">Az iráni klinikai esetsorozatban közölt tartományok alapján.</p>
+  </header>
+
+  <section class="card p-3 p-md-4 mb-4" aria-labelledby="input-title">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+      <div>
+        <div class="section-kicker mb-1">01 · Bemeneti adatok</div>
+        <h2 class="h4 mb-0" id="input-title">Számítási paraméterek</h2>
+      </div>
+      <button class="btn btn-sm btn-outline-secondary" id="resetBtn" type="button">Alapértékek visszaállítása</button>
+    </div>
+    <div class="row g-3">
+      <div class="col-12 col-md-6">
+        <label for="category" class="form-label">FIP-kategória</label>
+        <select class="form-select" id="category">
+          <option>Hasi folyadékgyülem</option>
+          <option>Mellkasi folyadékgyülem</option>
+          <option>Hasi + mellkasi folyadékgyülem</option>
+          <option>Nem effuzív (száraz)</option>
+          <option>Szemészeti</option>
+          <option>Neurológiai</option>
+          <option>Kevert</option>
+        </select>
+        <div class="form-text">A kategória a rögzített protokolltáblából választ tartományt.</div>
+      </div>
+      <div class="col-12 col-md-3">
+        <label for="weight" class="form-label">Testsúly (kg)</label>
+        <input class="form-control num" id="weight" type="number" min="0.001" step="0.001" value="2.9" inputmode="decimal">
+      </div>
+      <div class="col-12 col-md-3">
+        <label for="concentration" class="form-label">Koncentráció (mg/ml)</label>
+        <input class="form-control num" id="concentration" type="number" min="0.1" step="0.1" value="20" inputmode="decimal">
+      </div>
+    </div>
+    <div class="invalid-feedback d-block mt-3" id="validation" role="alert" aria-live="polite"></div>
+  </section>
+
+  <section class="card p-3 p-md-4 mb-4" aria-labelledby="protocol-title">
+    <div class="section-kicker mb-1">02 · Forrásadatok</div>
+    <h2 class="h4 mb-3" id="protocol-title">A kiválasztott kategória protokolltartománya</h2>
+    <div class="table-responsive">
+      <table class="table table-bordered mb-2">
+        <thead class="table-light">
+          <tr><th scope="col">Időpont</th><th scope="col">Minimum</th><th scope="col">Maximum</th><th scope="col">Egység</th></tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">Kezdő érték</th><td class="num" id="startMinDose">6</td><td class="num" id="startMaxDose">8</td><td>mg/ttkg</td></tr>
+          <tr><th scope="row">Kezelés végi érték</th><td class="num" id="endMinDose">8</td><td class="num" id="endMaxDose">11</td><td>mg/ttkg</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="small muted-note mb-0">Ezek a munkafüzetben rögzített forrásadatok. A felületen nem szerkeszthetők.</p>
+  </section>
+
+  <section class="card p-3 p-md-4 mb-4" aria-labelledby="results-title">
+    <div class="section-kicker mb-1">03 · Matematikai eredmények</div>
+    <h2 class="h4 mb-3" id="results-title">Átszámított mennyiségek</h2>
+    <div class="table-responsive">
+      <table class="table table-bordered align-middle mb-3">
+        <thead class="table-light">
+          <tr>
+            <th scope="col">Tartomány</th>
+            <th scope="col">Dózis (mg/ttkg)</th>
+            <th scope="col">Hatóanyag-mennyiség (mg)</th>
+            <th scope="col">Térfogat (ml)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">Kezdő – minimum</th>
+            <td class="num" id="sMinMgKg">6</td><td class="num" id="sMinMg">—</td>
+            <td class="num fw-bold" id="sMinMl">—</td>
+          </tr>
+          <tr>
+            <th scope="row">Kezdő – maximum</th>
+            <td class="num" id="sMaxMgKg">8</td><td class="num" id="sMaxMg">—</td>
+            <td class="num fw-bold" id="sMaxMl">—</td>
+          </tr>
+        </tbody>
+        <tbody class="table-group-divider">
+          <tr>
+            <th scope="row">Kezelés végi – minimum</th>
+            <td class="num" id="eMinMgKg">8</td><td class="num" id="eMinMg">—</td>
+            <td class="num fw-bold" id="eMinMl">—</td>
+          </tr>
+          <tr>
+            <th scope="row">Kezelés végi – maximum</th>
+            <td class="num" id="eMaxMgKg">11</td><td class="num" id="eMaxMg">—</td>
+            <td class="num fw-bold" id="eMaxMl">—</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="result-panel p-3">
+      <div class="fw-semibold mb-1">A számítás módja</div>
+      <div class="small num">Hatóanyag-mennyiség (mg) = testsúly (kg) × dózis (mg/ttkg)</div>
+      <div class="small num">Térfogat (ml) = hatóanyag-mennyiség (mg) ÷ koncentráció (mg/ml)</div>
+      <div class="small muted-note mt-2">A térfogat 3 tizedesjegyre kerekítve jelenik meg. A belső számítás teljes pontossággal történik.</div>
+    </div>
+  </section>
+
+  <section class="notice rounded-3 p-3 p-md-4 mb-4" aria-labelledby="warning-title">
+    <h2 class="h5 fw-bold" id="warning-title">Fontos korlátozások</h2>
+    <p class="mb-2">Ez a kalkulátor kizárólag a rögzített protokolltartományok és a megadott testsúly, illetve koncentráció alapján végzett matematikai átszámításra szolgál. Nem állatorvosi kezelési útmutató, csak a dokumentációval nem rendelkező készítményekhez kapcsolódó dózistartományok becslésére szolgál.</p>
+    <p class="mb-2">A forrásban közölt kategóriák és dózistartományok nem igazolják egy adott készítmény hatóanyag-tartalmát, tisztaságát vagy alkalmasságát. A kalkulátor nem ellenőrzi a készítmény azonosságát, tényleges koncentrációját, stabilitását vagy klinikai megfelelőségét.</p>
+    <p class="fw-semibold mb-0">A klinikai alkalmazást állatorvosnak kell megítélnie. <span class="text-danger"> Az eredmények nem használhatók önálló adagolási utasításként.</span></p>
+  </section>
+
+  <section class="card p-3 p-md-4 mb-4">
+    <div class="section-kicker mb-1">04 · Dokumentáció</div>
+    <h2 class="h4 mb-3">Protokolladatok és módszertan</h2>
+    <div class="accordion" id="documentation">
+      <div class="accordion-item">
+        <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#protocolTable" aria-expanded="false" aria-controls="protocolTable">Teljes rögzített protokolltábla</button></h3>
+        <div id="protocolTable" class="accordion-collapse collapse" data-bs-parent="#documentation">
+          <div class="accordion-body">
+            <div class="table-responsive">
+              <table class="table table-sm table-striped">
+                <thead><tr><th>Kategória</th><th>Kezdő min.</th><th>Kezdő max.</th><th>Végi min.</th><th>Végi max.</th></tr></thead>
+                <tbody>
+                  <tr><th>Hasi folyadékgyülem</th><td>6</td><td>8</td><td>8</td><td>11</td></tr>
+                  <tr><th>Mellkasi folyadékgyülem</th><td>8</td><td>8</td><td>10</td><td>11</td></tr>
+                  <tr><th>Hasi + mellkasi folyadékgyülem</th><td>8</td><td>8</td><td>10</td><td>11</td></tr>
+                  <tr><th>Nem effuzív (száraz)</th><td>9</td><td>10</td><td>11</td><td>13</td></tr>
+                  <tr><th>Szemészeti</th><td>9</td><td>10</td><td>11</td><td>13</td></tr>
+                  <tr><th>Neurológiai</th><td>10</td><td>12</td><td>12</td><td>17</td></tr>
+                  <tr><th>Kevert</th><td>10</td><td>12</td><td>12</td><td>17</td></tr>
+                </tbody>
+              </table>
+              <div class="small muted-note">Minden érték mértékegysége: mg/ttkg.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="accordion-item">
+        <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#methodNotes" aria-expanded="false" aria-controls="methodNotes">Forrás és módszertani megjegyzések</button></h3>
+        <div id="methodNotes" class="accordion-collapse collapse" data-bs-parent="#documentation">
+          <div class="accordion-body small">
+            <dl class="row mb-0">
+              <dt class="col-md-3">Az app célja</dt><dd class="col-md-9">A rögzített dózistartományok és a testsúly alapján a mg/ttkg → mg → ml matematikai átszámítása.</dd>
+              <dt class="col-md-3">Forrás megnevezése</dt><dd class="col-md-9">A 2025-ös iráni, 629 macskát feldolgozó retrospektív klinikai esetsorozat. A pontos bibliográfiai adatokat és az eredeti táblázatot az eredeti publikációban kell ellenőrizni. <br>
+              <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC12783618/" target="_blank">Analysis of risk factors, clinical data, treatment outcomes for cats with FIP using GS-441524 (2020–2024) – Scientific Reports, 2025 ↗</a>
+              </dd>
+              <dt class="col-md-3">Kategóriák</dt><dd class="col-md-9">Hasi folyadékgyülem; mellkasi folyadékgyülem; hasi + mellkasi folyadékgyülem; nem effuzív (száraz); szemészeti; neurológiai; kevert.</dd>
+              <dt class="col-md-3">Kerekítés</dt><dd class="col-md-9">A térfogat 3 tizedesjeggyel jelenik meg; a belső számítás a teljes pontosságot használja.</dd>
+              <dt class="col-md-3">Korlát</dt><dd class="col-md-9">A kalkulátor nem ellenőrzi a készítmény azonosságát, tisztaságát, tényleges koncentrációját, stabilitását vagy klinikai megfelelőségét.</dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="text-center small py-2">@2026 suzAnnaKom</footer>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+(() => {
+  "use strict";
+  const protocol = {
+    "Hasi folyadékgyülem": [6, 8, 8, 11],
+    "Mellkasi folyadékgyülem": [8, 8, 10, 11],
+    "Hasi + mellkasi folyadékgyülem": [8, 8, 10, 11],
+    "Nem effuzív (száraz)": [9, 10, 11, 13],
+    "Szemészeti": [9, 10, 11, 13],
+    "Neurológiai": [10, 12, 12, 17],
+    "Kevert": [10, 12, 12, 17]
+  };
+  const $ = id => document.getElementById(id);
+  const fields = ["category", "weight", "concentration"];
+  const fmt = (value, digits=3) => new Intl.NumberFormat("hu-HU", {
+    minimumFractionDigits: digits, maximumFractionDigits: digits
+  }).format(value);
+  const set = (id, value) => { $(id).textContent = value; };
+
+  function clearResults() {
+    ["startMinDose","startMaxDose","endMinDose","endMaxDose",
+     "sMinMgKg","sMaxMgKg","eMinMgKg","eMaxMgKg",
+     "sMinMg","sMaxMg","eMinMg","eMaxMg",
+     "sMinMl","sMaxMl","eMinMl","eMaxMl"].forEach(id => set(id, "—"));
+  }
+
+  function calculate() {
+    const weight = Number($("weight").value);
+    const concentration = Number($("concentration").value);
+    const category = $("category").value;
+    const validation = $("validation");
+    validation.textContent = "";
+
+    if (!Number.isFinite(weight) || weight <= 0) {
+      clearResults();
+      validation.textContent = "A testsúlynak nullánál nagyobb, érvényes számnak kell lennie.";
+      $("weight").setAttribute("aria-invalid", "true");
+      return;
+    }
+    $("weight").removeAttribute("aria-invalid");
+    if (!Number.isFinite(concentration) || concentration <= 0) {
+      clearResults();
+      validation.textContent = "A koncentrációnak nullánál nagyobb, érvényes számnak kell lennie.";
+      $("concentration").setAttribute("aria-invalid", "true");
+      return;
+    }
+    $("concentration").removeAttribute("aria-invalid");
+
+    const [startMin, startMax, endMin, endMax] = protocol[category];
+    set("startMinDose", startMin); set("startMaxDose", startMax);
+    set("endMinDose", endMin); set("endMaxDose", endMax);
+
+    const rows = [
+      ["sMin", startMin], ["sMax", startMax],
+      ["eMin", endMin], ["eMax", endMax]
+    ];
+    rows.forEach(([prefix, dose]) => {
+      const mg = weight * dose;
+      const ml = mg / concentration;
+      set(prefix + "MgKg", dose);
+      set(prefix + "Mg", fmt(mg));
+      set(prefix + "Ml", fmt(ml));
+    });
+  }
+
+  fields.forEach(id => $(id).addEventListener(id === "category" ? "change" : "input", calculate));
+  $("resetBtn").addEventListener("click", () => {
+    $("category").value = "Hasi folyadékgyülem";
+    $("weight").value = "2.9";
+    $("concentration").value = "20";
+    calculate();
+  });
+  calculate();
+})();
+</script>
+</body>
+</html>
